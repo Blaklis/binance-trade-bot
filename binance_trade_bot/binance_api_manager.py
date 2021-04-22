@@ -136,7 +136,7 @@ class BinanceAPIManager:
             try:
                 order_status = self.binance_client.get_order(symbol=origin_symbol + target_symbol, orderId=order_id)
 
-                if self._should_cancel_order(order_status):
+                if self._should_cancel_order(order_status, origin_symbol, target_symbol):
                     cancel_order = None
                     while cancel_order is None:
                         cancel_order = self.binance_client.cancel_order(
@@ -172,7 +172,7 @@ class BinanceAPIManager:
 
         return order_status
 
-    def _should_cancel_order(self, order_status):
+    def _should_cancel_order(self, order_status, origin_symbol, target_symbol):
         minutes = (time.time() - order_status["time"] / 1000) / 60
         timeout = 0
 
@@ -190,7 +190,10 @@ class BinanceAPIManager:
 
             if order_status["side"] == "BUY":
                 current_price = self.get_market_ticker_price(order_status["symbol"])
-                if float(current_price) * (1 - 0.001) > float(order_status["price"]):
+                origin_coin = db.get_coin(origin_symbol)
+                target_coin = db.get_coin(target_symbol)
+                transaction_fee = self.get_fee(origin_coin, target_coin, False)
+                if float(current_price) * (1 - float(transaction_fee)) > float(order_status["price"]):
                     return True
 
         return False
